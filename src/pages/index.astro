@@ -1,26 +1,7 @@
 ---
-
+// src/pages/index.astro
+import BaseLayout from '../layouts/BaseLayout.astro';
 ---
-
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<link rel="icon" href="/favicon.ico" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<header>
-		<h1>Hutton Edney's Computer Science Portfolio</h1>
-	</header>
-	<body>
-	<pre> 
-	<h2>
-Hello and welcome to my personal portfolio website. It is here that all computer
-science related work/projects is stored. I personally use this as a showcase that I can look 
-back on to see how far I've come. 
-	</h2> 
-	</pre>
-	</body>
-</html>
+<BaseLayout title="Hutton Edney — CS Portfolio">
+  <p>Hello and welcome to my personal portfolio...</p>
+</BaseLayout>
