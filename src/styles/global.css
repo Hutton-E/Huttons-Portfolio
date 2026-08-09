@@ -1,4 +1,6 @@
+@import "./fonts.css";
+
 body {
   margin: 1;
-  font-family: system-ui, sans-serif;
+  font-family: "FNAF", system-ui, sans-serif;
 }
