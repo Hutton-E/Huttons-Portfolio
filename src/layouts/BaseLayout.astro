@@ -10,8 +10,188 @@ const { title } = Astro.props;
     <title>{title}</title>
   </head>
   <body>
+    <canvas class="cursor-waves" aria-hidden="true"></canvas>
     <header><h1>Hutton Edney's Computer Science Portfolio</h1></header>
     <main><slot /></main>
     <footer></footer>
   </body>
 </html>
+
+<script>
+  const canvas = document.querySelector<HTMLCanvasElement>('.cursor-waves');
+  const context = canvas?.getContext('2d');
+
+  if (canvas && context && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const spacing = Number.parseFloat(getComputedStyle(document.body).getPropertyValue('--dot-spacing')) || 28;
+    type Particle = {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      radius: number;
+      phase: number;
+      movement: 'bounce' | 'wrap';
+    };
+
+    const initialWidth = window.innerWidth;
+    const initialHeight = window.innerHeight;
+    const columns = Math.max(1, Math.ceil(initialWidth / spacing));
+    const rows = Math.max(1, Math.ceil(initialHeight / spacing));
+    const particles: Particle[] = [];
+
+    for (let row = 0; row < rows; row += 1) {
+      for (let column = 0; column < columns; column += 1) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 3 + Math.random() * 7;
+
+        particles.push({
+          x: ((column + 0.5) * initialWidth) / columns,
+          y: ((row + 0.5) * initialHeight) / rows,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 1.35 + Math.random() * 0.45,
+          phase: Math.random() * Math.PI * 2,
+          movement: Math.random() < 0.55 ? 'bounce' : 'wrap',
+        });
+      }
+    }
+
+    let cursor: { x: number; y: number } | null = null;
+    let connections: Particle[] = [];
+    let opacity = 0;
+    let viewportWidth = initialWidth;
+    let viewportHeight = initialHeight;
+    let previousTime = 0;
+
+    const resizeCanvas = () => {
+      const nextWidth = window.innerWidth;
+      const nextHeight = window.innerHeight;
+
+      if (nextWidth !== viewportWidth || nextHeight !== viewportHeight) {
+        particles.forEach((particle) => {
+          particle.x = Math.min(nextWidth - particle.radius, Math.max(particle.radius, particle.x * nextWidth / viewportWidth));
+          particle.y = Math.min(nextHeight - particle.radius, Math.max(particle.radius, particle.y * nextHeight / viewportHeight));
+        });
+        viewportWidth = nextWidth;
+        viewportHeight = nextHeight;
+      }
+
+      const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.round(viewportWidth * pixelRatio);
+      canvas.height = Math.round(viewportHeight * pixelRatio);
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    };
+
+    const findNearestDots = (x: number, y: number) => {
+      const nearest: { particle: Particle; distance: number }[] = [];
+
+      particles.forEach((particle) => {
+        const deltaX = particle.x - x;
+        const deltaY = particle.y - y;
+        const distance = deltaX * deltaX + deltaY * deltaY;
+        const index = nearest.findIndex((candidate) => distance < candidate.distance);
+
+        if (index === -1) {
+          if (nearest.length < 10) nearest.push({ particle, distance });
+        } else {
+          nearest.splice(index, 0, { particle, distance });
+          if (nearest.length > 10) nearest.pop();
+        }
+      });
+
+      connections = nearest.map((candidate) => candidate.particle);
+    };
+
+    const draw = (time: number) => {
+      const delta = previousTime === 0 ? 0 : Math.min((time - previousTime) / 1000, 0.05);
+      previousTime = time;
+      context.clearRect(0, 0, viewportWidth, viewportHeight);
+      opacity += ((cursor ? 1 : 0) - opacity) * 0.08;
+
+      particles.forEach((particle) => {
+        particle.vx += Math.cos(time * 0.0005 + particle.phase) * 0.7 * delta;
+        particle.vy += Math.sin(time * 0.0004 + particle.phase) * 0.7 * delta;
+        const speed = Math.hypot(particle.vx, particle.vy);
+
+        if (speed > 12) {
+          particle.vx = (particle.vx / speed) * 12;
+          particle.vy = (particle.vy / speed) * 12;
+        }
+
+        particle.x += particle.vx * delta;
+        particle.y += particle.vy * delta;
+
+        if (particle.movement === 'bounce') {
+          if (particle.x < particle.radius || particle.x > viewportWidth - particle.radius) {
+            particle.vx *= -1;
+            particle.x = Math.min(viewportWidth - particle.radius, Math.max(particle.radius, particle.x));
+          }
+          if (particle.y < particle.radius || particle.y > viewportHeight - particle.radius) {
+            particle.vy *= -1;
+            particle.y = Math.min(viewportHeight - particle.radius, Math.max(particle.radius, particle.y));
+          }
+        } else {
+          if (particle.x < 0) particle.x = viewportWidth - particle.radius;
+          else if (particle.x > viewportWidth) particle.x = particle.radius;
+          if (particle.y < 0) particle.y = viewportHeight - particle.radius;
+          else if (particle.y > viewportHeight) particle.y = particle.radius;
+        }
+      });
+
+      context.beginPath();
+      particles.forEach((particle) => {
+        context.moveTo(particle.x + particle.radius, particle.y);
+        context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      });
+      context.fillStyle = 'rgba(142, 173, 153, 0.84)';
+      context.fill();
+
+      if (cursor && opacity > 0.01) {
+        findNearestDots(cursor.x, cursor.y);
+        connections.forEach((dot, index) => {
+          const deltaX = dot.x - cursor.x;
+          const deltaY = dot.y - cursor.y;
+          const length = Math.hypot(deltaX, deltaY);
+          const normalX = length === 0 ? 0 : -deltaY / length;
+          const normalY = length === 0 ? 0 : deltaX / length;
+          const steps = Math.max(8, Math.ceil(length / 4));
+          const frequency = 2 + (index % 3) * 0.55;
+          context.beginPath();
+
+          for (let step = 0; step <= steps; step += 1) {
+            const progress = step / steps;
+            const undulation = Math.sin(progress * Math.PI * frequency + time * 0.003 + index * 1.7)
+              * spacing * 0.2 * Math.sin(progress * Math.PI);
+            const x = cursor.x + deltaX * progress + normalX * undulation;
+            const y = cursor.y + deltaY * progress + normalY * undulation;
+
+            if (step === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
+          }
+
+          context.strokeStyle = `rgba(133, 221, 165, ${opacity * 0.46})`;
+          context.lineWidth = 1.2;
+          context.stroke();
+
+          context.beginPath();
+          context.arc(dot.x, dot.y, dot.radius + 0.45, 0, Math.PI * 2);
+          context.fillStyle = `rgba(196, 255, 211, ${opacity * 0.96})`;
+          context.fill();
+        });
+      }
+
+      requestAnimationFrame(draw);
+    };
+
+    resizeCanvas();
+    document.body.classList.add('particles-active');
+    window.addEventListener('resize', resizeCanvas, { passive: true });
+    window.addEventListener('pointermove', (event) => {
+      cursor = { x: event.clientX, y: event.clientY };
+    }, { passive: true });
+    window.addEventListener('pointerleave', () => {
+      cursor = null;
+    });
+    requestAnimationFrame(draw);
+  }
+</script>
