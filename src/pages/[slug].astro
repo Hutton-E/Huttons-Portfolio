@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { aboutSections, pageRoutes } from '../data/routes';
+import { aboutContent } from '../data/aboutContent';
 
 export function getStaticPaths() {
   return pageRoutes.map((route) => ({
@@ -12,25 +13,58 @@ export function getStaticPaths() {
 const { route } = Astro.props;
 ---
 <BaseLayout title={`${route.title} — Hutton Edney`} pageKey={route.slug}>
-  <a class="page-nav__back-link" href="/" data-route-back>
-    <span class="page-nav__arrow page-nav__arrow--back" aria-hidden="true">←</span>
-    <span>Back</span>
-  </a>
-  {route.slug === 'about-me' && (
-    <nav class="menu-panel page-nav" aria-label="About Me sections">
-    {route.slug === 'about-me' && aboutSections.map((section) => (
-      <a class="page-nav__link" href={`#${section.id}`}>
-        <span>{section.title}</span>
-        <span class="page-nav__arrow" aria-hidden="true">→</span>
+  <div class="split">
+    <div class="split__nav">
+      <a class="page-nav__back-link" href="/" data-route-back>
+        <span class="page-nav__arrow page-nav__arrow--back" aria-hidden="true">←</span>
+        <span>Back</span>
       </a>
-    ))}
-    </nav>
-  )}
-  {route.slug === 'about-me' && (
-    <div class="about-sections">
-      {aboutSections.map((section) => (
-        <section id={section.id} aria-label={section.title}></section>
-      ))}
+      {route.slug === 'about-me' && (
+        <nav class="menu-panel page-nav" aria-label="About Me sections">
+          {aboutSections.map((section) => (
+            <a class="page-nav__link" href={`#${section.id}`} data-section-link={section.id}>
+              <span>{section.title}</span>
+              <span class="page-nav__arrow" aria-hidden="true">→</span>
+            </a>
+          ))}
+        </nav>
+      )}
     </div>
-  )}
+    {route.slug === 'about-me' && (
+      <div class="split__content">
+        {aboutSections.map((section) => (
+          <section class="content-panel" id={section.id} aria-label={section.title} hidden>
+            {aboutContent[section.id].map((block) => (
+              <article class={`content-block content-block--${block.size}`}>
+                <h2>{block.heading}</h2>
+                {block.paragraphs.map((text) => <p>{text}</p>)}
+                {block.link && (
+                  <a class="content-block__link" href={block.link.href} target="_blank" rel="noopener">{block.link.label} ↗</a>
+                )}
+              </article>
+            ))}
+          </section>
+        ))}
+      </div>
+    )}
+  </div>
 </BaseLayout>
+
+<script>
+  const panels = Array.from(document.querySelectorAll<HTMLElement>('.content-panel'));
+  const links = Array.from(document.querySelectorAll<HTMLElement>('[data-section-link]'));
+
+  const showSection = () => {
+    if (panels.length === 0) return;
+    const id = window.location.hash.slice(1);
+    const activeId = panels.some((panel) => panel.id === id) ? id : panels[0].id;
+    panels.forEach((panel) => { panel.hidden = panel.id !== activeId; });
+    links.forEach((link) => {
+      if (link.dataset.sectionLink === activeId) link.setAttribute('aria-current', 'true');
+      else link.removeAttribute('aria-current');
+    });
+  };
+
+  window.addEventListener('hashchange', showSection);
+  showSection();
+</script>
