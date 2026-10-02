@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { aboutSections, pageRoutes } from '../data/routes';
+
+export function getStaticPaths() {
+  return pageRoutes.map((route) => ({
+    params: { slug: route.slug },
+    props: { route },
+  }));
+}
+
+const { route } = Astro.props;
+---
+<BaseLayout title={`${route.title} — Hutton Edney`} pageKey={route.slug}>
+  <a class="page-nav__back-link" href="/" data-route-back>
+    <span class="page-nav__arrow page-nav__arrow--back" aria-hidden="true">←</span>
+    <span>Back</span>
+  </a>
+  {route.slug === 'about-me' && (
+    <nav class="menu-panel page-nav" aria-label="About Me sections">
+    {route.slug === 'about-me' && aboutSections.map((section) => (
+      <a class="page-nav__link" href={`#${section.id}`}>
+        <span>{section.title}</span>
+        <span class="page-nav__arrow" aria-hidden="true">→</span>
+      </a>
+    ))}
+    </nav>
+  )}
+  {route.slug === 'about-me' && (
+    <div class="about-sections">
+      {aboutSections.map((section) => (
+        <section id={section.id} aria-label={section.title}></section>
+      ))}
+    </div>
+  )}
+</BaseLayout>

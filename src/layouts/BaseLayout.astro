@@ -1,7 +1,7 @@
 ---
 // src/layouts/BaseLayout.astro
 import '../styles/global.css';
-const { title } = Astro.props;
+const { title, pageKey = 'home' } = Astro.props;
 ---
 <html lang="en">
   <head>
@@ -9,20 +9,95 @@ const { title } = Astro.props;
     <meta name="viewport" content="width=device-width" />
     <title>{title}</title>
   </head>
-  <body>
+  <body data-page={pageKey}>
     <canvas class="cursor-waves" aria-hidden="true"></canvas>
-    <header><h1>Hutton Edney's Computer Science Portfolio</h1></header>
     <main><slot /></main>
     <footer></footer>
   </body>
 </html>
 
 <script>
+  const palettes = [
+    { background: '#101713', panel: '16, 27, 21', dots: '#82998a', particles: 'rgba(142, 173, 153, 0.84)', waves: '133, 221, 165', endpoints: '196, 255, 211' },
+    { background: '#14211c', panel: '20, 33, 28', dots: '#88a89a', particles: 'rgba(147, 184, 164, 0.84)', waves: '151, 222, 183', endpoints: '208, 255, 225' },
+    { background: '#172029', panel: '23, 32, 41', dots: '#899eae', particles: 'rgba(153, 177, 194, 0.84)', waves: '145, 204, 224', endpoints: '208, 242, 255' },
+    { background: '#211f19', panel: '33, 31, 25', dots: '#a69d80', particles: 'rgba(186, 174, 139, 0.84)', waves: '226, 204, 145', endpoints: '255, 242, 198' },
+    { background: '#211923', panel: '33, 25, 35', dots: '#a58ca8', particles: 'rgba(183, 156, 187, 0.84)', waves: '218, 164, 223', endpoints: '249, 218, 255' },
+    { background: '#20201a', panel: '32, 32, 26', dots: '#a3a084', particles: 'rgba(184, 179, 142, 0.84)', waves: '222, 210, 151', endpoints: '255, 247, 207' },
+  ];
+  const paletteStorageKey = 'portfolio:last-palette';
+
+  const applyRandomPalette = () => {
+    let previousIndex = -1;
+    try {
+      previousIndex = Number.parseInt(window.sessionStorage.getItem(paletteStorageKey) ?? '', 10);
+    } catch {
+      // Random selection still works if session storage is unavailable.
+    }
+
+    const choices = palettes.map((_, index) => index).filter((index) => index !== previousIndex);
+    const selectedIndex = choices[Math.floor(Math.random() * choices.length)];
+    const palette = palettes[selectedIndex];
+    const style = document.body.style;
+
+    style.setProperty('--page-bg', palette.background);
+    style.setProperty('--panel-rgb', palette.panel);
+    style.setProperty('--grid-dot', palette.dots);
+    style.setProperty('--particle-color', palette.particles);
+    style.setProperty('--wave-color', palette.waves);
+    style.setProperty('--wave-dot-color', palette.endpoints);
+
+    try {
+      window.sessionStorage.setItem(paletteStorageKey, String(selectedIndex));
+    } catch {
+      // The selected palette remains applied for this page view.
+    }
+
+    return palette;
+  };
+
+  let activePalette = applyRandomPalette();
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) activePalette = applyRandomPalette();
+  });
+
+  const routeBackLink = document.querySelector<HTMLAnchorElement>('[data-route-back]');
+  const currentPageKey = 'portfolio:current-page';
+  const previousPageKey = 'portfolio:previous-page';
+  const currentPath = window.location.pathname;
+
+  try {
+    const lastPath = window.sessionStorage.getItem(currentPageKey);
+
+    if (lastPath !== currentPath) {
+      if (lastPath?.startsWith('/') && lastPath !== currentPath) {
+        window.sessionStorage.setItem(previousPageKey, lastPath);
+      }
+      window.sessionStorage.setItem(currentPageKey, currentPath);
+    }
+
+    const previousPath = window.sessionStorage.getItem(previousPageKey);
+    if (routeBackLink && previousPath?.startsWith('/') && previousPath !== currentPath) {
+      routeBackLink.href = previousPath;
+    }
+  } catch {
+    // Keep the homepage fallback if session storage is unavailable.
+  }
+
   const canvas = document.querySelector<HTMLCanvasElement>('.cursor-waves');
   const context = canvas?.getContext('2d');
 
   if (canvas && context && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     const spacing = Number.parseFloat(getComputedStyle(document.body).getPropertyValue('--dot-spacing')) || 28;
+    let particleColor = activePalette.particles;
+    let waveColor = activePalette.waves;
+    let waveDotColor = activePalette.endpoints;
+    window.addEventListener('pageshow', (event) => {
+      if (!event.persisted) return;
+      particleColor = activePalette.particles;
+      waveColor = activePalette.waves;
+      waveDotColor = activePalette.endpoints;
+    });
     type Particle = {
       x: number;
       y: number;
@@ -143,7 +218,7 @@ const { title } = Astro.props;
         context.moveTo(particle.x + particle.radius, particle.y);
         context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
       });
-      context.fillStyle = 'rgba(142, 173, 153, 0.84)';
+      context.fillStyle = particleColor;
       context.fill();
 
       if (cursor && opacity > 0.01) {
@@ -169,13 +244,13 @@ const { title } = Astro.props;
             else context.lineTo(x, y);
           }
 
-          context.strokeStyle = `rgba(133, 221, 165, ${opacity * 0.46})`;
+          context.strokeStyle = `rgba(${waveColor}, ${opacity * 0.46})`;
           context.lineWidth = 1.2;
           context.stroke();
 
           context.beginPath();
           context.arc(dot.x, dot.y, dot.radius + 0.45, 0, Math.PI * 2);
-          context.fillStyle = `rgba(196, 255, 211, ${opacity * 0.96})`;
+          context.fillStyle = `rgba(${waveDotColor}, ${opacity * 0.96})`;
           context.fill();
         });
       }
